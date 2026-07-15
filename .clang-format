@@ -1,0 +1,53 @@
+# --- Baseline ---
+BasedOnStyle: LLVM
+Language: Cpp
+
+# --- Indentation / layout ---
+IndentWidth: 4
+TabWidth: 4
+UseTab: Never
+NamespaceIndentation: None
+
+# Keep braces aligned with the start of the statement
+# --- Braces / else placement ---
+BreakBeforeBraces: Allman
+
+# --- force multi-line for switch/case statements ---
+AllowShortCaseLabelsOnASingleLine: false
+
+# --- Always use braces for control statements ---
+InsertBraces: true
+
+# --- Short single-line exception for if(x) { do_something(); } ---
+# This allows short blocks *with braces* on one line. E.g., early returns.
+AllowShortIfStatementsOnASingleLine: true
+AllowShortBlocksOnASingleLine: Always
+AllowShortLoopsOnASingleLine: false
+
+# ---- Enum: always expand to allow per-enumerator comments ----
+AllowShortEnumsOnASingleLine: false
+
+# --- Spaces / operators ---
+SpaceBeforeParens: ControlStatements
+SpacesInParentheses: false
+
+# --- Pointer style: "int *p" ---
+PointerAlignment: Right
+
+# --- Line lengths ---
+ColumnLimit: 120
+
+# --- Signature breaking: Only break when needed ---
+# Single parameter can stay. Always break when >1 argument
+BinPackParameters: false
+AlignAfterOpenBracket: BlockIndent
+ContinuationIndentWidth: 4
+
+# --- Includes: group then alphabetical ---
+SortIncludes: true
+IncludeBlocks: Preserve # keep manually-separated blocks
+ 
+
+# --- Namespace formatting ---
+# Keep "namespace foo::bar { ... } // namespace foo::bar".
+FixNamespaceComments: true
