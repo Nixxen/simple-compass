@@ -1,0 +1,28 @@
+{
+    "version": 4,
+    "configurations": [
+        {
+            "name": "Windows",
+            "includePath": [
+                "${workspaceFolder}/**",
+                "${env:KENSHILIB_DEPS_DIR}",
+                "${env:KENSHILIB_DEPS_DIR}/KenshiLib/Include",
+                "${env:KENSHILIB_DEPS_DIR}/KenshiLib/Include/ogre",
+                "${env:BOOST_INCLUDE_PATH}",
+                "${env:KENSHILIB_DIR}",
+                "${env:KENSHILIB_DIR}/Include",
+                "${env:KENSHILIB_DIR}/Include/ogre"
+            ],
+            "browse": {
+                "path": [
+                    "${workspaceFolder}",
+                    "${env:KENSHILIB_DEPS_DIR}",
+                    "${env:BOOST_INCLUDE_PATH}",
+                    "${env:KENSHILIB_DIR}"
+                ],
+                "limitSymbolsToIncludedHeaders": true
+            },
+            "intelliSenseMode": "windows-msvc-x64"
+        }
+    ]
+}

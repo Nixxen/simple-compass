@@ -1,0 +1,16 @@
+# Build artifacts
+x64/
+*.o
+*.obj
+
+# Output files
+*.exe
+*.dll
+
+# Temporary files
+*.tmp
+*.log
+
+# IDE
+.vs/
+.idea/
