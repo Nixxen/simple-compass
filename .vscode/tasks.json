@@ -1,0 +1,23 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Build Release x64",
+            "type": "process",
+            "command": "${env:MSBUILD_PATH}\\MSBuild.exe",
+            "args": [
+                "${fileBasenameNoExtension}.vcxproj",
+                "/p:Configuration=Release",
+                "/p:Platform=x64"
+            ],
+            "options": {
+                "cwd": "${fileDirname}"
+            },
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": "$msCompile"
+        }
+    ]
+}
