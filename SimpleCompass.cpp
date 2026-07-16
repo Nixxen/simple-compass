@@ -73,41 +73,37 @@ static const char *CompassModeName(CompassMode mode)
     }
 }
 
-// Builds a rotating compass bar string with all 24 tick labels.
-// Each label is padded to kLabelWidth chars (centered) so the visual width
-// is uniform. The array is rotated so the tick closest to yaw_deg sits at the
-// center of the string. Together with center-aligned text on the button, this
-// makes the visible window track the camera direction.
+// Builds a rotating compass string by sliding a window over a circular
+// concatenation of all tick labels. Maps yaw to a character position
+// continuously, so the string scrolls one character at a time instead of
+// jumping by whole ticks. The window size is odd so the centre character
+// is a well-defined label character for the caret to point at.
 std::string BuildRotatingCompassString(float yaw_deg)
 {
-    static const int kLabelWidth = 4;
-    static const char *kTickLabels[24] = {"N", "15",  "30",  "NE", "60",  "75",  "E", "105", "120", "SE", "150", "165",
-                                          "S", "195", "210", "SW", "240", "255", "W", "285", "300", "NW", "330", "345"};
+    // Full 360° circular string: 24 tick labels joined by hyphens and spaces for approximation of spacing.
+    static const std::string kFullString =
+        "N - 15- 30- NE- 60- 75- E -105-120- SE-150-165- S -195-210- SW-240-255- W -285-300- NW-330-345- ";
+    static const int kFullLength = static_cast<int>(kFullString.size());
 
-    // Which tick (0-23) is closest to the current yaw
-    int center_tick = static_cast<int>((yaw_deg + 7.5f) / 15.0f) % 24;
+    // Map yaw [0..360) to character position [0..kFullLength) continuously
+    float char_pos_f = (yaw_deg / 360.0f) * kFullLength;
+    int center_char = static_cast<int>(char_pos_f) % kFullLength;
 
-    // Rotate so that center_tick ends up at index 12 (middle of 24)
-    int start_idx = (center_tick - 12 + 24) % 24;
+    // Window size - odd so the centre is a specific character the caret
+    // can point at. Must be wide enough to fill the button area.
+    static const int kWindowSize = 61;
+
+    // Start position so that center_char lands at the middle of the window
+    int start = center_char - kWindowSize / 2;
 
     std::string result;
-    for (int i = 0; i < 24; ++i)
+    result.reserve(kWindowSize);
+    for (int i = 0; i < kWindowSize; ++i)
     {
-        int idx = (start_idx + i) % 24;
-        std::string label = kTickLabels[idx];
-
-        // Center the label in a fixed-width field
-        int left_pad = (kLabelWidth - static_cast<int>(label.size())) / 2;
-        int right_pad = kLabelWidth - static_cast<int>(label.size()) - left_pad;
-        for (int p = 0; p < left_pad; ++p)
-        {
-            result.push_back(' ');
-        }
-        result += label;
-        for (int p = 0; p < right_pad; ++p)
-        {
-            result.push_back(' ');
-        }
+        int idx = start + i;
+        idx %= kFullLength;
+        if (idx < 0) { idx += kFullLength; }
+        result.push_back(kFullString[idx]);
     }
     return result;
 }
