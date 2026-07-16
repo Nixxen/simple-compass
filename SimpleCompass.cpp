@@ -15,14 +15,14 @@
 #include <string>
 
 // Compass widgets
-MyGUI::Button *g_compass_button = NULL;
-static const float kCompassButtonX = 0.5f;  // Centered horizontally
-static const float kCompassButtonY = 0.01f; // Near the top of the screen
-static const float kCompassButtonWidthFull = 0.20f;
-static const float kCompassButtonWidthNumbers = 0.05f;
-static const float kCompassButtonWidthDirection = kCompassButtonWidthNumbers * 0.5f;
-static const float kCompassButtonHeightTriple = 0.055f;
-static const float kCompassButtonHeightSingle = 0.02f;
+MyGUI::Button *g_compass_button = nullptr;
+static const float kCompassButtonX = 0.5F;  // Centered horizontally
+static const float kCompassButtonY = 0.01F; // Near the top of the screen
+static const float kCompassButtonWidthFull = 0.20F;
+static const float kCompassButtonWidthNumbers = 0.05F;
+static const float kCompassButtonWidthDirection = kCompassButtonWidthNumbers * 0.5F;
+static const float kCompassButtonHeightTriple = 0.055F;
+static const float kCompassButtonHeightSingle = 0.02F;
 
 enum CompassMode
 {
@@ -36,25 +36,25 @@ CompassMode g_compact_mode = CompassMode_NumberWithDirection;
 // Returns yaw in degrees (0-360), 0 = North
 float GetYawDegrees()
 {
-    if (!au || !au->camera) { return 0.0f; }
+    if (au == nullptr || au->camera == nullptr) { return 0.0F; }
     Ogre::Vector3 facing = au->camera->getFacingDirection();
     float yaw_rad = std::atan2(facing.x, -facing.z); // -Z = North = 0
-    float yaw_deg = yaw_rad * 180.0f / boost::math::constants::pi<float>();
-    if (yaw_deg < 0.0f) { yaw_deg += 360.0f; }
+    float yaw_deg = yaw_rad * 180.0F / boost::math::constants::pi<float>();
+    if (yaw_deg < 0.0F) { yaw_deg += 360.0F; }
     return yaw_deg;
 }
 
 // Returns the cardinal direction name for a given bearing (0-360)
 const char *DirectionName(float bearing)
 {
-    if (bearing < 22.5f) { return "N"; }
-    if (bearing < 67.5f) { return "NE"; }
-    if (bearing < 112.5f) { return "E"; }
-    if (bearing < 157.5f) { return "SE"; }
-    if (bearing < 202.5f) { return "S"; }
-    if (bearing < 247.5f) { return "SW"; }
-    if (bearing < 292.5f) { return "W"; }
-    if (bearing < 337.5f) { return "NW"; }
+    if (bearing < 22.5F) { return "N"; }
+    if (bearing < 67.5F) { return "NE"; }
+    if (bearing < 112.5F) { return "E"; }
+    if (bearing < 157.5F) { return "SE"; }
+    if (bearing < 202.5F) { return "S"; }
+    if (bearing < 247.5F) { return "SW"; }
+    if (bearing < 292.5F) { return "W"; }
+    if (bearing < 337.5F) { return "NW"; }
     return "N";
 }
 
@@ -86,7 +86,7 @@ std::string BuildRotatingCompassString(float yaw_deg)
     static const int kFullLength = static_cast<int>(kFullString.size());
 
     // Map yaw [0..360) to character position [0..kFullLength) continuously
-    float char_pos_f = (yaw_deg / 360.0f) * kFullLength;
+    float char_pos_f = (yaw_deg / 360.0F) * static_cast<float>(kFullLength);
     int center_char = static_cast<int>(char_pos_f) % kFullLength;
 
     // Window size - odd so the centre is a specific character the caret
@@ -94,7 +94,7 @@ std::string BuildRotatingCompassString(float yaw_deg)
     static const int kWindowSize = 61;
 
     // Start position so that center_char lands at the middle of the window
-    int start = center_char - kWindowSize / 2;
+    int start = center_char - (kWindowSize / 2);
 
     std::string result;
     result.reserve(kWindowSize);
@@ -113,10 +113,21 @@ void OnCompassClick(MyGUI::WidgetPtr sender)
 {
     auto nextMode = (static_cast<int>(g_compact_mode) + 1) % static_cast<int>(CompassMode_Count);
     g_compact_mode = static_cast<CompassMode>(nextMode);
-    float new_width = (g_compact_mode == CompassMode_Full)            ? kCompassButtonWidthFull
-                      : (g_compact_mode == CompassMode_DirectionOnly) ? kCompassButtonWidthDirection
-                                                                      : kCompassButtonWidthNumbers;
-    float new_height = (g_compact_mode == CompassMode_Full) ? kCompassButtonHeightTriple : kCompassButtonHeightSingle;
+    float new_width = kCompassButtonWidthNumbers;
+    float new_height = kCompassButtonHeightSingle;
+    switch (g_compact_mode)
+    {
+    case CompassMode_Full:
+        new_width = kCompassButtonWidthFull;
+        new_height = kCompassButtonHeightTriple;
+        break;
+    case CompassMode_NumberWithDirection:
+        new_width = kCompassButtonWidthNumbers;
+        break;
+    case CompassMode_DirectionOnly:
+        new_width = kCompassButtonWidthDirection;
+        break;
+    }
     g_compass_button->setRealSize(new_width, new_height);
     std::string log_message = std::string("Compass mode changed to ") + CompassModeName(g_compact_mode);
     DebugLog(log_message.c_str());
@@ -124,7 +135,7 @@ void OnCompassClick(MyGUI::WidgetPtr sender)
 
 void UpdateCompass()
 {
-    if (!g_compass_button)
+    if (g_compass_button == nullptr)
     {
         ErrorLog("Compass button not initialized!");
         return;
@@ -165,13 +176,13 @@ void UpdateCompass()
 }
 
 // Title screen constructor hook
-TitleScreen *(*TitleScreen_orig)(TitleScreen *) = NULL;
+TitleScreen *(*TitleScreen_orig)(TitleScreen *) = nullptr;
 TitleScreen *TitleScreen_hook(TitleScreen *thisptr)
 {
     TitleScreen *title_screen = TitleScreen_orig(thisptr);
 
     MyGUI::Gui *gui = MyGUI::Gui::getInstancePtr();
-    if (!gui)
+    if (gui == nullptr)
     {
         ErrorLog("MyGUI::Gui instance not found!");
         return title_screen;
