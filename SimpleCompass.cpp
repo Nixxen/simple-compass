@@ -12,8 +12,6 @@
 
 #include <boost/math/constants/constants.hpp>
 
-#include <string>
-
 // Compass widgets
 MyGUI::Button *g_compass_button = nullptr;
 static const float kCompassButtonX = 0.5F;  // Centered horizontally
@@ -32,6 +30,44 @@ enum CompassMode
     CompassMode_Count
 };
 CompassMode g_compact_mode = CompassMode_NumberWithDirection;
+
+static const char kFullString[] =
+    "N]-15-30-[NE]-60-75-[E]-105-120-[SE]-150-165-[S]-195-210-[SW]-240-255-[W]-285-300-[NW]-330-345-[";
+static const int kFullLength = static_cast<int>(sizeof(kFullString) - 1);
+static const float kDegreesPerTick = 15.0F;
+static const int kTicksInCompass = 24;
+
+// Character index of each tick label's centre character in kFullString.
+// Tick i corresponds to bearing i*15 degrees.
+// Label strings for each tick, in order of bearing (0, 15, 30, ...).
+static const char *kTickLabels[kTicksInCompass] = {"N",   "15",  "30",  "NE",  "60",  "75",  "E",   "105",
+                                                   "120", "SE",  "150", "165", "S",   "195", "210", "SW",
+                                                   "240", "255", "W",   "285", "300", "NW",  "330", "345"};
+
+// Runtime-initialised centre character position of each tick label in kFullString.
+static float g_tick_char_positions[kTicksInCompass] = {0.0F};
+static bool g_tick_positions_initialized = false;
+
+// Per-character pixel widths for kFullString, measured at init.
+static float g_char_widths[kFullLength] = {0.0F};
+static bool g_pixels_initialized = false;
+
+// Initialises g_tick_char_positions by finding each label in kFullString.
+void InitTickPositions()
+{
+    if (g_tick_positions_initialized) { return; }
+    int search_start = 0;
+    for (int i = 0; i < kTicksInCompass; ++i)
+    {
+        const char *found = strstr(kFullString + search_start, kTickLabels[i]);
+        if (found == nullptr) { continue; }
+        int start = static_cast<int>(found - kFullString);
+        int len = static_cast<int>(strlen(kTickLabels[i]));
+        g_tick_char_positions[i] = static_cast<float>(start) + (static_cast<float>(len - 1) * 0.5F);
+        search_start = start + len;
+    }
+    g_tick_positions_initialized = true;
+}
 
 // Returns yaw in degrees (0-360), 0 = North
 float GetYawDegrees()
@@ -73,38 +109,109 @@ static const char *CompassModeName(CompassMode mode)
     }
 }
 
-// Builds a rotating compass string by sliding a window over a circular
-// concatenation of all tick labels. Maps yaw to a character position
-// continuously, so the string scrolls one character at a time instead of
-// jumping by whole ticks. The window size is odd so the centre character
-// is a well-defined label character for the caret to point at.
+// Measures cumulative pixel widths of kFullString to find the character
+// at the pixel centre of the rendered string. Must be called once after
+// the button is created.
+void InitCharPixelTable()
+{
+    if (g_compass_button == nullptr) { return; }
+
+    static float pixel_positions[kFullLength + 1] = {0.0F};
+    pixel_positions[0] = 0.0F;
+    std::string prefix;
+    for (int i = 0; i < kFullLength; ++i)
+    {
+        prefix.push_back(kFullString[i]);
+        g_compass_button->setCaption(prefix);
+        pixel_positions[i + 1] = static_cast<float>(g_compass_button->getTextSize().width);
+    }
+
+    // Restore initial caption
+    g_compass_button->setCaption("0(N)");
+
+    // Store per-character widths
+    for (int i = 0; i < kFullLength; ++i)
+    {
+        g_char_widths[i] = pixel_positions[i + 1] - pixel_positions[i];
+    }
+    g_pixels_initialized = true;
+}
+
+// Builds a rotating compass string by sliding a window over kFullString.
+// Maps yaw to a character position by interpolating between tick label
+// positions. The button clips the string automatically.
 std::string BuildRotatingCompassString(float yaw_deg)
 {
-    // Full 360° circular string: 24 tick labels joined by hyphens and spaces for approximation of spacing.
-    static const std::string kFullString =
-        "N - 15- 30- NE- 60- 75- E -105-120- SE-150-165- S -195-210- SW-240-255- W -285-300- NW-330-345- ";
-    static const int kFullLength = static_cast<int>(kFullString.size());
+    if (!g_pixels_initialized) { return std::string(kFullString); }
 
-    // Map yaw [0..360) to character position [0..kFullLength) continuously
-    float char_pos_f = (yaw_deg / 360.0F) * static_cast<float>(kFullLength);
-    int center_char = static_cast<int>(char_pos_f) % kFullLength;
+    // Map yaw to continuous tick index [0..24)
+    float tick_f = yaw_deg / kDegreesPerTick;
+    int tick_low = static_cast<int>(tick_f) % kTicksInCompass;
+    int tick_high = (tick_low + 1) % kTicksInCompass;
+    float frac = tick_f - static_cast<float>(static_cast<int>(tick_f));
 
-    // Window size - odd so the centre is a specific character the caret
-    // can point at. Must be wide enough to fill the button area.
-    static const int kWindowSize = 61;
-
-    // Start position so that center_char lands at the middle of the window
-    int start = center_char - (kWindowSize / 2);
-
-    std::string result;
-    result.reserve(kWindowSize);
-    for (int i = 0; i < kWindowSize; ++i)
+    // Interpolate character position between adjacent ticks
+    float char_pos_f;
+    float pos_low = g_tick_char_positions[tick_low];
+    float pos_high = g_tick_char_positions[tick_high];
+    if (tick_high > tick_low)
     {
-        int idx = start + i;
-        idx %= kFullLength;
+        // Normal case
+        char_pos_f = pos_low + (frac * (pos_high - pos_low));
+    }
+    else
+    {
+        // Wrap around: tick 23 → tick 0
+        float dist = static_cast<float>(kFullLength) - pos_low + pos_high;
+        char_pos_f = pos_low + (frac * dist);
+        if (char_pos_f >= static_cast<float>(kFullLength)) { char_pos_f -= static_cast<float>(kFullLength); }
+    }
+
+    int center_idx = static_cast<int>(std::floor(char_pos_f + 0.5F));
+    if (center_idx >= kFullLength) { center_idx -= kFullLength; }
+
+    // Build the full string so that center_idx lands at the pixel centre
+    // of the rendered text. The button clips the rest.
+    std::string result;
+    result.reserve(kFullLength);
+
+    // First pass: build a candidate string with center_idx at position 0
+    // so we can compute pixel widths of the rotated string.
+    static int candidate[kFullLength];
+    for (int i = 0; i < kFullLength; ++i)
+    {
+        int idx = (center_idx + i) % kFullLength;
+        if (idx < 0) { idx += kFullLength; }
+        candidate[i] = idx;
+    }
+
+    // Find the output position whose cumulative pixel width is closest to half
+    float total_width = 0.0F;
+    for (int i = 0; i < kFullLength; ++i) { total_width += g_char_widths[candidate[i]]; }
+    float half = total_width * 0.5F;
+    float accum = 0.0F;
+    int pixel_center_pos = 0;
+    float best_dist = half;
+    for (int i = 0; i < kFullLength; ++i)
+    {
+        accum += g_char_widths[candidate[i]];
+        float dist = (accum > half) ? accum - half : half - accum;
+        if (dist < best_dist)
+        {
+            best_dist = dist;
+            pixel_center_pos = i;
+        }
+    }
+
+    // Build the final string with center_idx at pixel_center_pos
+    int offset = -pixel_center_pos;
+    for (int i = 0; i < kFullLength; ++i)
+    {
+        int idx = (center_idx + offset + i) % kFullLength;
         if (idx < 0) { idx += kFullLength; }
         result.push_back(kFullString[idx]);
     }
+
     return result;
 }
 
@@ -130,7 +237,7 @@ void OnCompassClick(MyGUI::WidgetPtr sender)
     }
     g_compass_button->setRealSize(new_width, new_height);
     std::string log_message = std::string("Compass mode changed to ") + CompassModeName(g_compact_mode);
-    DebugLog(log_message.c_str());
+    DebugLog(log_message);
 }
 
 void UpdateCompass()
@@ -199,6 +306,9 @@ TitleScreen *TitleScreen_hook(TitleScreen *thisptr)
     g_compass_button->setCaption("0(N)");
     g_compass_button->setVisible(false);
     g_compass_button->eventMouseButtonClick += MyGUI::newDelegate(OnCompassClick);
+
+    InitTickPositions();
+    InitCharPixelTable();
 
     return title_screen;
 }
