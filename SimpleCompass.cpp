@@ -10,17 +10,29 @@
 
 #include <core/Functions.h>
 
+#include <algorithm>
 #include <boost/math/constants/constants.hpp>
 
 // Compass widgets
 MyGUI::Button *g_compass_button = nullptr;
+MyGUI::TextBox *g_compass_left = nullptr;
+MyGUI::TextBox *g_compass_center = nullptr;
+MyGUI::TextBox *g_compass_right = nullptr;
+MyGUI::TextBox *g_compass_caret = nullptr;
+MyGUI::TextBox *g_compass_heading = nullptr;
 static const float kCompassButtonX = 0.5F;  // Centered horizontally
 static const float kCompassButtonY = 0.01F; // Near the top of the screen
 static const float kCompassButtonWidthFull = 0.20F;
 static const float kCompassButtonWidthNumbers = 0.05F;
 static const float kCompassButtonWidthDirection = kCompassButtonWidthNumbers * 0.5F;
-static const float kCompassButtonHeightTriple = 0.055F;
+static const float kCompassButtonHeightDouble = 0.04F;
 static const float kCompassButtonHeightSingle = 0.02F;
+
+static const MyGUI::Colour &GetCompassTextColour()
+{
+    static const MyGUI::Colour colour(1.0F, 1.0F, 0.0F); // Yellow
+    return colour;
+}
 
 enum CompassMode
 {
@@ -37,8 +49,6 @@ static const int kFullLength = static_cast<int>(sizeof(kFullString) - 1);
 static const float kDegreesPerTick = 15.0F;
 static const int kTicksInCompass = 24;
 
-// Character index of each tick label's centre character in kFullString.
-// Tick i corresponds to bearing i*15 degrees.
 // Label strings for each tick, in order of bearing (0, 15, 30, ...).
 static const char *kTickLabels[kTicksInCompass] = {"N",   "15",  "30",  "NE",  "60",  "75",  "E",   "105",
                                                    "120", "SE",  "150", "165", "S",   "195", "210", "SW",
@@ -47,10 +57,6 @@ static const char *kTickLabels[kTicksInCompass] = {"N",   "15",  "30",  "NE",  "
 // Runtime-initialised centre character position of each tick label in kFullString.
 static float g_tick_char_positions[kTicksInCompass] = {0.0F};
 static bool g_tick_positions_initialized = false;
-
-// Per-character pixel widths for kFullString, measured at init.
-static float g_char_widths[kFullLength] = {0.0F};
-static bool g_pixels_initialized = false;
 
 // Initialises g_tick_char_positions by finding each label in kFullString.
 void InitTickPositions()
@@ -109,110 +115,87 @@ static const char *CompassModeName(CompassMode mode)
     }
 }
 
-// Measures cumulative pixel widths of kFullString to find the character
-// at the pixel centre of the rendered string. Must be called once after
-// the button is created.
-void InitCharPixelTable()
+// Maps yaw to a character position in kFullString by interpolating between
+// tick label centre positions. Returns the interpolated float character index.
+float GetCenterCharIndex(float yaw_deg)
 {
-    if (g_compass_button == nullptr) { return; }
-
-    static float pixel_positions[kFullLength + 1] = {0.0F};
-    pixel_positions[0] = 0.0F;
-    std::string prefix;
-    for (int i = 0; i < kFullLength; ++i)
-    {
-        prefix.push_back(kFullString[i]);
-        g_compass_button->setCaption(prefix);
-        pixel_positions[i + 1] = static_cast<float>(g_compass_button->getTextSize().width);
-    }
-
-    // Restore initial caption
-    g_compass_button->setCaption("0(N)");
-
-    // Store per-character widths
-    for (int i = 0; i < kFullLength; ++i)
-    {
-        g_char_widths[i] = pixel_positions[i + 1] - pixel_positions[i];
-    }
-    g_pixels_initialized = true;
-}
-
-// Builds a rotating compass string by sliding a window over kFullString.
-// Maps yaw to a character position by interpolating between tick label
-// positions. The button clips the string automatically.
-std::string BuildRotatingCompassString(float yaw_deg)
-{
-    if (!g_pixels_initialized) { return std::string(kFullString); }
-
-    // Map yaw to continuous tick index [0..24)
     float tick_f = yaw_deg / kDegreesPerTick;
     int tick_low = static_cast<int>(tick_f) % kTicksInCompass;
     int tick_high = (tick_low + 1) % kTicksInCompass;
     float frac = tick_f - static_cast<float>(static_cast<int>(tick_f));
 
-    // Interpolate character position between adjacent ticks
-    float char_pos_f;
     float pos_low = g_tick_char_positions[tick_low];
     float pos_high = g_tick_char_positions[tick_high];
-    if (tick_high > tick_low)
-    {
-        // Normal case
-        char_pos_f = pos_low + (frac * (pos_high - pos_low));
-    }
-    else
-    {
-        // Wrap around: tick 23 → tick 0
-        float dist = static_cast<float>(kFullLength) - pos_low + pos_high;
-        char_pos_f = pos_low + (frac * dist);
-        if (char_pos_f >= static_cast<float>(kFullLength)) { char_pos_f -= static_cast<float>(kFullLength); }
-    }
 
-    int center_idx = static_cast<int>(std::floor(char_pos_f + 0.5F));
-    if (center_idx >= kFullLength) { center_idx -= kFullLength; }
+    if (tick_high > tick_low) { return pos_low + (frac * (pos_high - pos_low)); }
 
-    // Build the full string so that center_idx lands at the pixel centre
-    // of the rendered text. The button clips the rest.
-    std::string result;
-    result.reserve(kFullLength);
-
-    // First pass: build a candidate string with center_idx at position 0
-    // so we can compute pixel widths of the rotated string.
-    static int candidate[kFullLength];
-    for (int i = 0; i < kFullLength; ++i)
-    {
-        int idx = (center_idx + i) % kFullLength;
-        if (idx < 0) { idx += kFullLength; }
-        candidate[i] = idx;
-    }
-
-    // Find the output position whose cumulative pixel width is closest to half
-    float total_width = 0.0F;
-    for (int i = 0; i < kFullLength; ++i) { total_width += g_char_widths[candidate[i]]; }
-    float half = total_width * 0.5F;
-    float accum = 0.0F;
-    int pixel_center_pos = 0;
-    float best_dist = half;
-    for (int i = 0; i < kFullLength; ++i)
-    {
-        accum += g_char_widths[candidate[i]];
-        float dist = (accum > half) ? accum - half : half - accum;
-        if (dist < best_dist)
-        {
-            best_dist = dist;
-            pixel_center_pos = i;
-        }
-    }
-
-    // Build the final string with center_idx at pixel_center_pos
-    int offset = -pixel_center_pos;
-    for (int i = 0; i < kFullLength; ++i)
-    {
-        int idx = (center_idx + offset + i) % kFullLength;
-        if (idx < 0) { idx += kFullLength; }
-        result.push_back(kFullString[idx]);
-    }
-
+    // Wrap around: tick 23 → tick 0
+    float dist = static_cast<float>(kFullLength) - pos_low + pos_high;
+    float result = pos_low + (frac * dist);
+    if (result >= static_cast<float>(kFullLength)) { result -= static_cast<float>(kFullLength); }
     return result;
+}
+
+// Builds the three compass substrings for the tiled layout.
+// center_idx is the integer character index at the centre of the window.
+// The center textbox gets exactly 1 character (the semantic character at the
+// exact facing direction). Left and right each get kFullLength/2 characters
+// collected outward from center, with left reversed for right-aligned display.
+void BuildCompassSubstrings(int center_idx, std::string &left_out, std::string &center_out, std::string &right_out)
+{
+    center_out.clear();
+    center_out.push_back(kFullString[center_idx]);
+
+    int half_len = kFullLength / 2;
+
+    // Left: walk backwards from center_idx-1, collect half_len chars, then reverse
+    left_out.clear();
+    for (int i = 0; i < half_len; ++i)
+    {
+        int idx = (center_idx - 1 - i + kFullLength) % kFullLength;
+        left_out.push_back(kFullString[idx]);
+    }
+    std::reverse(left_out.begin(), left_out.end());
+
+    // Right: walk forwards from center_idx+1, collect half_len chars
+    right_out.clear();
+    for (int i = 0; i < half_len; ++i)
+    {
+        int idx = (center_idx + 1 + i) % kFullLength;
+        right_out.push_back(kFullString[idx]);
+    }
+}
+
+// Creates or repositions the compass line text widgets to match the button's current size.
+void SetupCompassLineWidgets()
+{
+    if (g_compass_button == nullptr || g_compass_left == nullptr || g_compass_center == nullptr ||
+        g_compass_right == nullptr || g_compass_caret == nullptr || g_compass_heading == nullptr)
+    {
+        ErrorLog("One or more compass  widgets are not initialized!");
+        return;
+    }
+
+    int button_width = g_compass_button->getWidth();
+    int button_h = g_compass_button->getHeight();
+
+    static const int first_line_y = 14; // TODO: Base these on font size to work more dynamically
+    static const int caret_line_y = 32;
+    static const int heading_line_y = 50;
+    int text_height = g_compass_left->getFontHeight();
+    // 1 character wide. Estimate width to be roughly equal to font height, minus padding
+    int center_width = static_cast<int>(text_height * 0.8);
+    int center_x = (button_width - center_width) / 2;
+    int right_x = center_x + center_width;
+    int left_right_width = button_width - right_x;
+    int heading_width = center_width * 8; // Estimate 6 + a few char safety margin for padding
+    int heading_x = (button_width - heading_width) / 2;
+
+    g_compass_left->setCoord(0, first_line_y, left_right_width, text_height);
+    g_compass_center->setCoord(center_x, first_line_y, center_width, text_height);
+    g_compass_right->setCoord(right_x, first_line_y, left_right_width, text_height);
+    g_compass_caret->setCoord(center_x, caret_line_y, center_width, text_height);
+    g_compass_heading->setCoord(heading_x, heading_line_y, heading_width, text_height);
 }
 
 // Click handler to cycle compact mode
@@ -226,7 +209,7 @@ void OnCompassClick(MyGUI::WidgetPtr sender)
     {
     case CompassMode_Full:
         new_width = kCompassButtonWidthFull;
-        new_height = kCompassButtonHeightTriple;
+        new_height = kCompassButtonHeightDouble;
         break;
     case CompassMode_NumberWithDirection:
         new_width = kCompassButtonWidthNumbers;
@@ -236,6 +219,17 @@ void OnCompassClick(MyGUI::WidgetPtr sender)
         break;
     }
     g_compass_button->setRealSize(new_width, new_height);
+
+    // Show/hide compass line widgets based on mode
+    bool show_compass_line = (g_compact_mode == CompassMode_Full);
+    g_compass_left->setVisible(show_compass_line);
+    g_compass_center->setVisible(show_compass_line);
+    g_compass_right->setVisible(show_compass_line);
+    g_compass_caret->setVisible(show_compass_line);
+    g_compass_heading->setVisible(show_compass_line);
+
+    if (show_compass_line) { SetupCompassLineWidgets(); }
+
     std::string log_message = std::string("Compass mode changed to ") + CompassModeName(g_compact_mode);
     DebugLog(log_message);
 }
@@ -255,17 +249,23 @@ void UpdateCompass()
     if (g_compact_mode == CompassMode_Full)
     {
         // Three-line layout:
-        //   Line 1: rotating tick labels (centered on current yaw)
+        //   Line 1: rotating tick labels via three tiled text widgets
         //   Line 2: caret pointing at the current value
         //   Line 3: exact yaw + direction
-        std::string rotating = BuildRotatingCompassString(yaw);
-        std::string caret = "^";
+        float char_f = GetCenterCharIndex(yaw);
+        int center_idx = static_cast<int>(std::floor(char_f + 0.5F));
+        if (center_idx >= kFullLength) { center_idx -= kFullLength; }
+
+        std::string left_str, center_str, right_str;
+        BuildCompassSubstrings(center_idx, left_str, center_str, right_str);
+
+        g_compass_left->setCaption(left_str);
+        g_compass_center->setCaption(center_str);
+        g_compass_right->setCaption(right_str);
 
         std::ostringstream num_oss;
         num_oss << static_cast<int>(yaw) << "(" << DirectionName(yaw) << ")";
-        std::string number = num_oss.str();
-
-        caption = rotating + "\n" + caret + "\n" + number;
+        g_compass_heading->setCaption(num_oss.str());
     }
     else if (g_compact_mode == CompassMode_NumberWithDirection)
     {
@@ -307,8 +307,52 @@ TitleScreen *TitleScreen_hook(TitleScreen *thisptr)
     g_compass_button->setVisible(false);
     g_compass_button->eventMouseButtonClick += MyGUI::newDelegate(OnCompassClick);
 
+    // Create compass line text widgets as children of the button.
+    // Their coordinates are relative to the button, positioned by SetupCompassLineWidgets().
+    g_compass_left = g_compass_button->createWidget<MyGUI::TextBox>(
+        "Kenshi_TextboxStandardText", MyGUI::IntCoord(0, 0, 1, 1), MyGUI::Align::Default, "CompassLeft"
+    );
+    g_compass_left->setTextAlign(MyGUI::Align::Right);
+    g_compass_left->setTextColour(GetCompassTextColour());
+    g_compass_left->setVisible(false);
+    g_compass_left->eventMouseButtonClick += MyGUI::newDelegate(OnCompassClick);
+
+    g_compass_center = g_compass_button->createWidget<MyGUI::TextBox>(
+        "Kenshi_TextboxStandardText", MyGUI::IntCoord(0, 0, 1, 1), MyGUI::Align::Default, "CompassCenter"
+    );
+    g_compass_center->setTextAlign(MyGUI::Align::Center);
+    g_compass_center->setTextColour(GetCompassTextColour());
+    g_compass_center->setVisible(false);
+    // FIXME: Zoom effect is not working as expected. Might just leave it as is
+    g_compass_center->setFontHeight(static_cast<int>(g_compass_center->getFontHeight() * 1.5));
+    g_compass_center->eventMouseButtonClick += MyGUI::newDelegate(OnCompassClick);
+
+    g_compass_right = g_compass_button->createWidget<MyGUI::TextBox>(
+        "Kenshi_TextboxStandardText", MyGUI::IntCoord(0, 0, 1, 1), MyGUI::Align::Default, "CompassRight"
+    );
+    g_compass_right->setTextAlign(MyGUI::Align::Left);
+    g_compass_right->setTextColour(GetCompassTextColour());
+    g_compass_right->setVisible(false);
+    g_compass_right->eventMouseButtonClick += MyGUI::newDelegate(OnCompassClick);
+
+    g_compass_caret = g_compass_button->createWidget<MyGUI::TextBox>(
+        "Kenshi_TextboxStandardText", MyGUI::IntCoord(0, 0, 1, 1), MyGUI::Align::Default, "CompassCaret"
+    );
+    g_compass_caret->setTextAlign(MyGUI::Align::Center);
+    g_compass_caret->setTextColour(MyGUI::Colour(1.0F, 0.0F, 0.0F)); // Red
+    g_compass_caret->setCaption("^");
+    g_compass_caret->setVisible(false);
+    g_compass_caret->eventMouseButtonClick += MyGUI::newDelegate(OnCompassClick);
+
+    g_compass_heading = g_compass_button->createWidget<MyGUI::TextBox>(
+        "Kenshi_TextboxStandardText", MyGUI::IntCoord(0, 0, 1, 1), MyGUI::Align::Default, "CompassHeading"
+    );
+    g_compass_heading->setTextAlign(MyGUI::Align::Center);
+    g_compass_heading->setTextColour(GetCompassTextColour());
+    g_compass_heading->setVisible(false);
+    g_compass_heading->eventMouseButtonClick += MyGUI::newDelegate(OnCompassClick);
+
     InitTickPositions();
-    InitCharPixelTable();
 
     return title_screen;
 }
