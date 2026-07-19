@@ -19,7 +19,6 @@ MyGUI::TextBox *g_compass_left = nullptr;
 MyGUI::TextBox *g_compass_center = nullptr;
 MyGUI::TextBox *g_compass_right = nullptr;
 MyGUI::TextBox *g_compass_caret = nullptr;
-MyGUI::TextBox *g_compass_heading = nullptr;
 static const float kCompassButtonX = 0.5F;  // Centered horizontally
 static const float kCompassButtonY = 0.01F; // Near the top of the screen
 static const float kCompassButtonWidthFull = 0.20F;
@@ -170,7 +169,7 @@ void BuildCompassSubstrings(int center_idx, std::string &left_out, std::string &
 void SetupCompassLineWidgets()
 {
     if (g_compass_button == nullptr || g_compass_left == nullptr || g_compass_center == nullptr ||
-        g_compass_right == nullptr || g_compass_caret == nullptr || g_compass_heading == nullptr)
+        g_compass_right == nullptr || g_compass_caret == nullptr)
     {
         ErrorLog("One or more compass  widgets are not initialized!");
         return;
@@ -195,7 +194,6 @@ void SetupCompassLineWidgets()
     g_compass_center->setCoord(center_x, first_line_y, center_width, text_height);
     g_compass_right->setCoord(right_x, first_line_y, left_right_width, text_height);
     g_compass_caret->setCoord(center_x, caret_line_y, center_width, text_height);
-    g_compass_heading->setCoord(heading_x, heading_line_y, heading_width, text_height);
 }
 
 // Click handler to cycle compact mode
@@ -227,7 +225,6 @@ void OnCompassClick(MyGUI::WidgetPtr sender)
     g_compass_center->setVisible(show_compass_line);
     g_compass_right->setVisible(show_compass_line);
     g_compass_caret->setVisible(show_compass_line);
-    g_compass_heading->setVisible(show_compass_line);
 
     if (show_compass_line) { SetupCompassLineWidgets(); }
 
@@ -265,8 +262,8 @@ void UpdateCompass()
         g_compass_right->setCaption(right_str);
 
         std::ostringstream num_oss;
-        num_oss << static_cast<int>(yaw) << "(" << DirectionName(yaw) << ")";
-        g_compass_heading->setCaption(num_oss.str());
+        num_oss << "\n" << static_cast<int>(yaw) << "(" << DirectionName(yaw) << ")";
+        caption = num_oss.str();
     }
     else if (g_compact_mode == CompassMode_NumberWithDirection)
     {
@@ -343,14 +340,6 @@ TitleScreen *TitleScreen_hook(TitleScreen *thisptr)
     g_compass_caret->setCaption("^");
     g_compass_caret->setVisible(false);
     g_compass_caret->eventMouseButtonClick += MyGUI::newDelegate(OnCompassClick);
-
-    g_compass_heading = g_compass_button->createWidget<MyGUI::TextBox>(
-        "Kenshi_TextboxStandardText", MyGUI::IntCoord(0, 0, 1, 1), MyGUI::Align::Default, "CompassHeading"
-    );
-    g_compass_heading->setTextAlign(MyGUI::Align::Center);
-    g_compass_heading->setTextColour(GetCompassTextColour());
-    g_compass_heading->setVisible(false);
-    g_compass_heading->eventMouseButtonClick += MyGUI::newDelegate(OnCompassClick);
 
     InitTickPositions();
 
