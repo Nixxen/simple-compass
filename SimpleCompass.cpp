@@ -219,6 +219,7 @@ void OnCompassClick(MyGUI::WidgetPtr sender)
         break;
     }
     g_compass_button->setRealSize(new_width, new_height);
+    g_compass_button->setRealPosition((1.0F - new_width) / 2, kCompassButtonY);
 
     // Show/hide compass line widgets based on mode
     bool show_compass_line = (g_compact_mode == CompassMode_Full);
@@ -296,9 +297,8 @@ TitleScreen *TitleScreen_hook(TitleScreen *thisptr)
     }
 
     // Clickable button to cycle compass mode
-    MyGUI::FloatCoord button_coord(
-        kCompassButtonX, kCompassButtonY, kCompassButtonWidthNumbers, kCompassButtonHeightSingle
-    );
+    float initial_x = (1.0F - kCompassButtonWidthNumbers) / 2;
+    MyGUI::FloatCoord button_coord(initial_x, kCompassButtonY, kCompassButtonWidthNumbers, kCompassButtonHeightSingle);
     g_compass_button = gui->createWidgetReal<MyGUI::Button>(
         "Kenshi_Button1", button_coord, MyGUI::Align::Default, "Window", "CompassButton"
     );
