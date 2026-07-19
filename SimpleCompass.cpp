@@ -175,22 +175,24 @@ void SetupCompassLineWidgets()
         return;
     }
 
-    int button_width = g_compass_button->getWidth();
-    int button_h = g_compass_button->getHeight();
+    static const int button_width = g_compass_button->getWidth();
+    static const int button_h = g_compass_button->getHeight();
 
-    static const int first_line_y = 14; // TODO: Base these on font size to work more dynamically
-    static const int caret_line_y = 32;
-    static const int heading_line_y = 50;
-    int text_height = g_compass_left->getFontHeight();
+    static const int button_padding = 5; // Rough spacing from outsie edge to inside button
+    static const int text_height = g_compass_left->getFontHeight();
+    static const int first_line_y = button_padding;
+    // Almost overlap with scrolling text
+    static const int caret_line_y = first_line_y + (text_height / 2);
     // 1 character wide. Estimate width to be roughly equal to font height, minus padding
-    int center_width = static_cast<int>(text_height * 0.8);
-    int center_x = (button_width - center_width) / 2;
-    int right_x = center_x + center_width;
-    int left_right_width = button_width - right_x;
-    int heading_width = center_width * 8; // Estimate 6 + a few char safety margin for padding
-    int heading_x = (button_width - heading_width) / 2;
+    static const int center_width = static_cast<int>(text_height * 0.8);
+    static const int center_x = (button_width - center_width) / 2;
+    static const int right_x = center_x + center_width;
+    static const int left_right_padding = button_padding;
+    static const int left_right_width = button_width - right_x - left_right_padding;
+    static const int heading_width = center_width * 8; // Estimate 6 + a few char safety margin for padding
+    static const int heading_x = (button_width - heading_width) / 2;
 
-    g_compass_left->setCoord(0, first_line_y, left_right_width, text_height);
+    g_compass_left->setCoord(0 + left_right_padding, first_line_y, left_right_width, text_height);
     g_compass_center->setCoord(center_x, first_line_y, center_width, text_height);
     g_compass_right->setCoord(right_x, first_line_y, left_right_width, text_height);
     g_compass_caret->setCoord(center_x, caret_line_y, center_width, text_height);
