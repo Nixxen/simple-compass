@@ -29,9 +29,29 @@ static const float kCompassButtonHeightSingle = 0.02F;
 
 static const MyGUI::Colour &GetCompassTextColour()
 {
-    static const MyGUI::Colour colour(1.0F, 1.0F, 0.0F); // Yellow
+    static const MyGUI::Colour colour(0.4F, 0.380392F, 0.356863F); // Kenshi button normal text color
     return colour;
 }
+
+static const MyGUI::Colour &GetCompassTextHighlightColour()
+{
+    static const MyGUI::Colour colour(0.505882F, 0.4F, 0.207843F); // Kenshi button highlighted text color
+    return colour;
+}
+
+static void SetCompassTextHighlighted(bool highlighted)
+{
+    const MyGUI::Colour &col = highlighted ? GetCompassTextHighlightColour() : GetCompassTextColour();
+    g_compass_button->setTextColour(col);
+    g_compass_left->setTextColour(col);
+    g_compass_center->setTextColour(col);
+    g_compass_right->setTextColour(col);
+}
+
+void OnCompassMouseSetFocus(MyGUI::WidgetPtr /*sender*/, MyGUI::WidgetPtr /*old*/) { SetCompassTextHighlighted(true); }
+
+void OnCompassMouseLostFocus(MyGUI::WidgetPtr /*sender*/, MyGUI::WidgetPtr /*new_widget*/)
+{ SetCompassTextHighlighted(false); }
 
 enum CompassMode
 {
@@ -178,11 +198,11 @@ void SetupCompassLineWidgets()
     static const int button_width = g_compass_button->getWidth();
     static const int button_h = g_compass_button->getHeight();
 
-    static const int button_padding = 5; // Rough spacing from outsie edge to inside button
+    static const int button_padding = 5; // Rough spacing from outside edge to inside button
     static const int text_height = g_compass_left->getFontHeight();
     static const int first_line_y = button_padding;
     // Almost overlap with scrolling text
-    static const int caret_line_y = first_line_y + (text_height / 2);
+    static const int caret_line_y = first_line_y + static_cast<int>(text_height * 0.7);
     // 1 character wide. Estimate width to be roughly equal to font height, minus padding
     static const int center_width = static_cast<int>(text_height * 0.8);
     static const int center_x = (button_width - center_width) / 2;
@@ -305,6 +325,8 @@ TitleScreen *TitleScreen_hook(TitleScreen *thisptr)
     g_compass_button->setCaption("0(N)");
     g_compass_button->setVisible(false);
     g_compass_button->eventMouseButtonClick += MyGUI::newDelegate(OnCompassClick);
+    g_compass_button->eventMouseSetFocus += MyGUI::newDelegate(OnCompassMouseSetFocus);
+    g_compass_button->eventMouseLostFocus += MyGUI::newDelegate(OnCompassMouseLostFocus);
 
     // Create compass line text widgets as children of the button.
     // Their coordinates are relative to the button, positioned by SetupCompassLineWidgets().
@@ -315,6 +337,8 @@ TitleScreen *TitleScreen_hook(TitleScreen *thisptr)
     g_compass_left->setTextColour(GetCompassTextColour());
     g_compass_left->setVisible(false);
     g_compass_left->eventMouseButtonClick += MyGUI::newDelegate(OnCompassClick);
+    g_compass_left->eventMouseSetFocus += MyGUI::newDelegate(OnCompassMouseSetFocus);
+    g_compass_left->eventMouseLostFocus += MyGUI::newDelegate(OnCompassMouseLostFocus);
 
     g_compass_center = g_compass_button->createWidget<MyGUI::TextBox>(
         "Kenshi_TextboxStandardText", MyGUI::IntCoord(0, 0, 1, 1), MyGUI::Align::Default, "CompassCenter"
@@ -325,6 +349,8 @@ TitleScreen *TitleScreen_hook(TitleScreen *thisptr)
     // FIXME: Zoom effect is not working as expected. Might just leave it as is
     g_compass_center->setFontHeight(static_cast<int>(g_compass_center->getFontHeight() * 1.5));
     g_compass_center->eventMouseButtonClick += MyGUI::newDelegate(OnCompassClick);
+    g_compass_center->eventMouseSetFocus += MyGUI::newDelegate(OnCompassMouseSetFocus);
+    g_compass_center->eventMouseLostFocus += MyGUI::newDelegate(OnCompassMouseLostFocus);
 
     g_compass_right = g_compass_button->createWidget<MyGUI::TextBox>(
         "Kenshi_TextboxStandardText", MyGUI::IntCoord(0, 0, 1, 1), MyGUI::Align::Default, "CompassRight"
@@ -333,6 +359,8 @@ TitleScreen *TitleScreen_hook(TitleScreen *thisptr)
     g_compass_right->setTextColour(GetCompassTextColour());
     g_compass_right->setVisible(false);
     g_compass_right->eventMouseButtonClick += MyGUI::newDelegate(OnCompassClick);
+    g_compass_right->eventMouseSetFocus += MyGUI::newDelegate(OnCompassMouseSetFocus);
+    g_compass_right->eventMouseLostFocus += MyGUI::newDelegate(OnCompassMouseLostFocus);
 
     g_compass_caret = g_compass_button->createWidget<MyGUI::TextBox>(
         "Kenshi_TextboxStandardText", MyGUI::IntCoord(0, 0, 1, 1), MyGUI::Align::Default, "CompassCaret"
@@ -342,6 +370,8 @@ TitleScreen *TitleScreen_hook(TitleScreen *thisptr)
     g_compass_caret->setCaption("^");
     g_compass_caret->setVisible(false);
     g_compass_caret->eventMouseButtonClick += MyGUI::newDelegate(OnCompassClick);
+    g_compass_caret->eventMouseSetFocus += MyGUI::newDelegate(OnCompassMouseLostFocus);
+    g_compass_caret->eventMouseLostFocus += MyGUI::newDelegate(OnCompassMouseLostFocus);
 
     InitTickPositions();
 
