@@ -3,7 +3,7 @@
 A Kenshi mod that adds a configurable compass HUD element to show your current heading in the game world.
 
 Get it from your preferred modding platform:
-- **Steam Workshop**: [TBD:SimpleCompass](https://steamcommunity.com/sharedfiles/filedetails/?id=TBD)
+- **Steam Workshop**: [SimpleCompass](https://steamcommunity.com/sharedfiles/filedetails/?id=3771008243)
 - **NexusMods**: [TBD:SimpleCompass](https://www.nexusmods.com/kenshi/mods/TBD)
 
 ## Features

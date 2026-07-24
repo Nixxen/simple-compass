@@ -1,6 +1,6 @@
-[h1]SimpleCompass[/h1]
+[h1]Simple Compass[/h1]
 
-Never lose your bearings in Kenshi again. SimpleCompass adds a compact, clickable compass HUD element to the game screen showing your current heading in degrees and cardinal direction.
+Never lose your bearings in Kenshi again. Simple Compass adds a compact, clickable compass HUD element to the top of the game screen showing your current heading in degrees and cardinal direction.
 
 [b]Requirements[/b]
 [list]
