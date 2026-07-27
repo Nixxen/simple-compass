@@ -1,5 +1,6 @@
 Checks: >
   bugprone-*,
+  clang-analyzer-*,
   modernize-*,
   -modernize-use-trailing-return-type,
   -modernize-avoid-c-arrays,
