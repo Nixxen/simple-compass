@@ -1,17 +1,20 @@
 #include <Debug.h>
 
+#include <core/Functions.h>
+
 #include <kenshi/CameraClass.h>
 #include <kenshi/GameWorld.h>
 #include <kenshi/Globals.h>
+#include <kenshi/InputHandler.h>
 #include <kenshi/KingOfRenderThread.h>
+#include <kenshi/PlayerInterface.h>
 #include <kenshi/gui/TitleScreen.h>
 
 #include <mygui/MyGui_Types.h>
 
-#include <core/Functions.h>
+#include <boost/math/constants/constants.hpp>
 
 #include <algorithm>
-#include <boost/math/constants/constants.hpp>
 
 // Compass widgets
 MyGUI::Button *gCompassButton = nullptr;
@@ -61,6 +64,8 @@ enum CompassMode
     CompassMode_Count
 };
 CompassMode gCompactMode = CompassMode_NumberWithDirection;
+
+static bool gHudHidden = false;
 
 static const char kFullString[] =
     "N]-15-30-[NE]-60-75-[E]-105-120-[SE]-150-165-[S]-195-210-[SW]-240-255-[W]-285-300-[NW]-330-345-[";
@@ -258,7 +263,7 @@ void UpdateCompass()
         ErrorLog("Compass button not initialized!");
         return;
     }
-    if (gCompassButton->getVisible() == false) { gCompassButton->setVisible(true); }
+    if (!gHudHidden && gCompassButton->getVisible() == false) { gCompassButton->setVisible(true); }
 
     float yaw = GetYawDegrees();
     std::string caption;
@@ -377,6 +382,58 @@ TitleScreen *TitleScreen_hook(TitleScreen *thisptr)
     return titleScreen;
 }
 
+void (*PlayerInterface_updateUT_orig)(PlayerInterface *) = nullptr;
+void PlayerInterface_updateUT_hook(PlayerInterface *thisptr)
+{
+    static bool sHudHiddenKnown = false;
+    static bool sHudHiddenPrevious = false;
+    bool toggleHudEventSeen = false;
+    bool hudVisibilityCalibrated = false;
+    bool visibilityChanged = false;
+
+    if (key != nullptr)
+    {
+        InputHandler::Command *toggleBar = key->getCommand("toggle_bar");
+        if (toggleBar != nullptr)
+        {
+            if (key->events.count(toggleBar) > 0)
+            {
+                gHudHidden = !gHudHidden;
+                sHudHiddenKnown = true;
+                toggleHudEventSeen = true;
+            }
+
+            if (!sHudHiddenKnown && toggleBar->boolean != nullptr)
+            {
+                gHudHidden = !(*(toggleBar->boolean));
+                sHudHiddenKnown = true;
+                hudVisibilityCalibrated = true;
+            }
+        }
+    }
+
+    PlayerInterface_updateUT_orig(thisptr);
+
+    if (gHudHidden != sHudHiddenPrevious)
+    {
+        gCompassButton->setVisible(!gHudHidden);
+        sHudHiddenPrevious = gHudHidden;
+        visibilityChanged = true;
+    }
+
+    if (toggleHudEventSeen || hudVisibilityCalibrated || visibilityChanged)
+    {
+        std::stringstream logline;
+        logline << "SimpleCompass: hud"
+                << " known=" << (sHudHiddenKnown ? "true" : "false") << " hidden=" << (gHudHidden ? "true" : "false")
+                << " toggleEvent=" << (toggleHudEventSeen ? "true" : "false")
+                << " visibilityCalibrated=" << (hudVisibilityCalibrated ? "true" : "false")
+                << " visibilityChanged=" << (visibilityChanged ? "true" : "false")
+                << " visible=" << (gCompassButton->getVisible() ? "true" : "false");
+        DebugLog(logline.str().c_str());
+    }
+}
+
 // Main loop hook
 void (*GameWorld_mainLoop_orig)(GameWorld *thisptr, float time);
 void GameWorld_mainLoop_hook(GameWorld *thisptr, float time)
@@ -391,6 +448,14 @@ __declspec(dllexport) void startPlugin()
         KenshiLib::AddHook(KenshiLib::GetRealAddress(&TitleScreen::_CONSTRUCTOR), TitleScreen_hook, &TitleScreen_orig))
     {
         ErrorLog("Could not add TitleScreen hook!");
+    }
+
+    if (KenshiLib::SUCCESS != KenshiLib::AddHook(
+                                  KenshiLib::GetRealAddress(&PlayerInterface::updateUT), PlayerInterface_updateUT_hook,
+                                  &PlayerInterface_updateUT_orig
+                              ))
+    {
+        ErrorLog("Could not add PlayerInterface hook!");
     }
 
     if (KenshiLib::SUCCESS != KenshiLib::AddHook(
