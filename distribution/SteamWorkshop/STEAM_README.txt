@@ -11,7 +11,7 @@ Never lose your bearings in Kenshi again. Simple Compass adds a compact, clickab
 [b]How to Use[/b]
 [list=1]
 [*]Load any save or start a new game
-[*]Look at the top-center of the screen - the compass is always visible
+[*]Look at the top-center of the screen - the compass is always visible (unless the player hides the game HUD)
 [*]Click the compass button to cycle between display modes
 [/list]
 
@@ -40,3 +40,10 @@ Never lose your bearings in Kenshi again. Simple Compass adds a compact, clickab
 [*]Confirm RE_Kenshi is installed and enabled
 [*]If the compass does not appear, verify the mod is activated in the launcher
 [/list]
+
+[b]Shout outs[/b]
+[list]
+[*]BFrizzleFoShizzle, the creator of KenshiLib and RE_Kenshi. Without either, this mod would not exist.
+[*]Emkej, the creator of Job-B-Gone. Used as a base for understanding how to hide the compass when the main UI is hidden.
+[/list]
+
