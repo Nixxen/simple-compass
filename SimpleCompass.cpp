@@ -66,6 +66,7 @@ enum CompassMode
 CompassMode gCompactMode = CompassMode_NumberWithDirection;
 
 static bool gHudHidden = false;
+static const bool kVerboseDebugLogging = false;
 
 static const char kFullString[] =
     "N]-15-30-[NE]-60-75-[E]-105-120-[SE]-150-165-[S]-195-210-[SW]-240-255-[W]-285-300-[NW]-330-345-[";
@@ -420,6 +421,8 @@ void PlayerInterface_updateUT_hook(PlayerInterface *thisptr)
         sHudHiddenPrevious = gHudHidden;
         visibilityChanged = true;
     }
+
+    if (!kVerboseDebugLogging) { return; }
 
     if (toggleHudEventSeen || hudVisibilityCalibrated || visibilityChanged)
     {
